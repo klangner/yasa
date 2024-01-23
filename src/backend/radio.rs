@@ -39,11 +39,7 @@ impl FMRadio<'_> {
         Self { runtime, handle: None }
     }
 
-    pub fn start(&mut self) -> Result<()> {
-        let gain = 30.0;
-        let rate = 1000000.0;
-        let frequency = 92_000_000.0;
-
+    pub fn start(&mut self, frequency: f64, gain: f64, rate: f64, args: &str) -> Result<()> {
         let sample_rate = rate as u32;
         let freq_offset = rate / 4.0;
         println!("Frequency Offset {freq_offset:?}");
@@ -66,11 +62,12 @@ impl FMRadio<'_> {
 
         // Create a new Seify SDR block with the given parameters
         let src = SourceBuilder::new()
-            .args("")?
+            .args(args)?
             .frequency(frequency + freq_offset)
             .sample_rate(rate)
             .gain(gain)
-            .build()?;
+            .build()
+            .expect("Can't create source");
 
         // Store the `freq` port ID for later use
         // let freq_port_id = src

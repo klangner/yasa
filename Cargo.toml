@@ -12,3 +12,5 @@ futuresdr = { version = "0.0.37", features = ["soapy", "audio", "rtlsdr"] }
 eframe = "0.25"
 egui_extras = { version = "0.25", features = ["image"] }
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+toml = "0.8"
+serde = "1.0.195"

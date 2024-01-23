@@ -2,22 +2,58 @@
 
 mod backend;
 
+use std::fs;
+
 use eframe::{egui, CreationContext};
 use backend::radio::FMRadio;
+use serde::Deserialize;
+
+
+#[derive(Deserialize)]
+struct Config {
+   source: Source,
+}
+
+#[derive(Deserialize)]
+struct Source {
+    frequency: f64,
+    gain: f64,
+    rate: f64,
+    args: String,
+}
 
 struct YasaApp<'a> {
     radio: FMRadio<'a>,
     is_running: bool,
+    config: Config,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { source: Default::default() }
+    }
+}
+
+impl Default for Source {
+    fn default() -> Self {
+        Self { 
+            frequency: 100_000_000.0, 
+            gain: 30.0, 
+            rate: 100_000.0, 
+            args: String::default(), 
+        }
+    }
 }
 
 impl<'a> YasaApp<'a> {
-    fn new(cc: &CreationContext<'_>, radio: FMRadio<'a>) -> Self {
+    fn new(cc: &CreationContext<'_>, radio: FMRadio<'a>, config: Config) -> Self {
         // init GUI
         cc.egui_ctx.set_zoom_factor(1.5);
 
         Self {
             radio,
             is_running: false,
+            config,
         }
     }
 }
@@ -36,7 +72,9 @@ impl eframe::App for YasaApp<'_> {
                             self.radio.stop().unwrap();
                             self.is_running = false;
                         } else {
-                            self.radio.start().unwrap();
+                            let source = &self.config.source;
+                            self.radio.start( source.frequency, source.gain, source.rate, &source.args)
+                                .expect("Can't start radio");
                             self.is_running = true;
                         }
 
@@ -72,16 +110,23 @@ impl eframe::App for YasaApp<'_> {
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    let config = match fs::read_to_string("config.toml") {
+        Ok(c) => toml::from_str(&c).unwrap(),
+        Err(_) => Config::default(),
+    };
+
+    // Init backend
+    let radio = FMRadio::init();
+    
+    // Init GUI
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1200.0, 800.0]),
         ..Default::default()
     };
 
-    let radio = FMRadio::init();
-
     eframe::run_native(
         "Yet Another SDR App",
         options,
-        Box::new(|cc| Box::new(YasaApp::new(cc, radio))),
+        Box::new(|cc| Box::new(YasaApp::new(cc, radio, config))),
     )
 }
