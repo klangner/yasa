@@ -1,9 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod radio;
+mod backend;
 
 use eframe::{egui, CreationContext};
-use radio::FMRadio;
+use backend::radio::FMRadio;
 
 struct YasaApp<'a> {
     radio: FMRadio<'a>,
