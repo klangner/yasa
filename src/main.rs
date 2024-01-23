@@ -4,7 +4,7 @@ mod backend;
 
 use std::fs;
 
-use eframe::{egui, CreationContext};
+use eframe::{egui::{self, Key}, CreationContext};
 use backend::radio::FMRadio;
 use serde::Deserialize;
 
@@ -67,7 +67,7 @@ impl eframe::App for YasaApp<'_> {
                 ui.horizontal(|ui| {
                     let run_label = if self.is_running {"Stop"} else {"Run"};
                     let run_btn = ui.button(run_label);
-                    if run_btn.clicked() {
+                    if run_btn.clicked() || ctx.input(|i| i.key_pressed(Key::P)) {
                         if self.is_running {
                             self.radio.stop().unwrap();
                             self.is_running = false;
