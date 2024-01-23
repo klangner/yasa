@@ -8,10 +8,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-futuresdr = { version = "0.0.37", features = [] }
+futuresdr = { version = "0.0.37", features = ["soapy", "audio", "rtlsdr"] }
 eframe = "0.25"
 egui_extras = { version = "0.25", features = ["image"] }
-env_logger = { version = "0.10", default-features = false, features = [
-    "auto-color",
-    "humantime",
-] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }

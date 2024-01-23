@@ -1,53 +1,87 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::egui;
+mod radio;
 
-fn main() -> Result<(), eframe::Error> {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "My egui App",
-        options,
-        Box::new(|cc| {
-            // This gives us image support:
-            egui_extras::install_image_loaders(&cc.egui_ctx);
+use eframe::{egui, CreationContext};
+use radio::FMRadio;
 
-            Box::<MyApp>::default()
-        }),
-    )
+struct YasaApp<'a> {
+    radio: FMRadio<'a>,
+    is_running: bool,
 }
 
-struct MyApp {
-    name: String,
-    age: u32,
-}
+impl<'a> YasaApp<'a> {
+    fn new(cc: &CreationContext<'_>, radio: FMRadio<'a>) -> Self {
+        // init GUI
+        cc.egui_ctx.set_zoom_factor(1.5);
 
-impl Default for MyApp {
-    fn default() -> Self {
         Self {
-            name: "Arthur".to_owned(),
-            age: 42,
+            radio,
+            is_running: false,
         }
     }
 }
 
-impl eframe::App for MyApp {
+impl eframe::App for YasaApp<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("My egui Application");
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Your name: ");
-                ui.text_edit_singleline(&mut self.name)
-                    .labelled_by(name_label.id);
+        
+        egui::TopBottomPanel::top("toolbar")
+            .default_height(50.0)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let run_label = if self.is_running {"Stop"} else {"Run"};
+                    let run_btn = ui.button(run_label);
+                    if run_btn.clicked() {
+                        if self.is_running {
+                            self.radio.stop().unwrap();
+                            self.is_running = false;
+                        } else {
+                            self.radio.start().unwrap();
+                            self.is_running = true;
+                        }
+
+                    }
+                });
             });
-            ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-            if ui.button("Click each year").clicked() {
-                self.age += 1;
-            }
-            ui.label(format!("Hello '{}', age {}", self.name, self.age));
+
+        // egui::SidePanel::left("source_panel")
+        //     .resizable(true)
+        //     .default_width(150.0)
+        //     .width_range(80.0..=200.0)
+        //     .show(ctx, |ui| {
+        //         ui.label("Source")
+        //     });
+
+        // egui::SidePanel::right("output_panel")
+        //     .resizable(true)
+        //     .default_width(500.0)
+        //     // .width_range(100.0..=300.0)
+        //     .show(ctx, |ui| {
+        //         ui.label("Output")
+        //     });
+
+        // Needs to be last
+        egui::CentralPanel::default()
+            .show(ctx, |ui| {
+                ui.label("Bookmarks")
         });
     }
+
+}
+
+
+fn main() -> Result<(), eframe::Error> {
+    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([1200.0, 800.0]),
+        ..Default::default()
+    };
+
+    let radio = FMRadio::init();
+
+    eframe::run_native(
+        "Yet Another SDR App",
+        options,
+        Box::new(|cc| Box::new(YasaApp::new(cc, radio))),
+    )
 }
