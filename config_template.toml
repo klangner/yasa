@@ -1,6 +1,6 @@
 [source]
 
-frequency = 92_000_000
+frequency = 100_000_000
 gain = 30
 rate = 1_000_000
 args = ""
