@@ -17,7 +17,7 @@ struct Config {
 
 #[derive(Deserialize)]
 struct Source {
-    frequency: u32,
+    frequency: u64,
     gain: f64,
     rate: f64,
     args: String,
@@ -26,13 +26,13 @@ struct Source {
 #[derive(Deserialize)]
 struct Bookmark {
     name: String,
-    frequency: u32,
+    frequency: u64,
 }
 
 struct YasaApp<'a> {
     radio: FMRadio<'a>,
     is_running: bool,
-    current_freq: u32,
+    current_freq: u64,
     config: Config,
 }
 
@@ -101,7 +101,7 @@ impl<'a> YasaApp<'a> {
         // Needs to be last
         egui::CentralPanel::default()
             .show(ctx, |ui| {
-                ui.label(format!("Freq: {}", self.current_freq));
+                ui.label(format!("f =  {}", self.current_freq));
             });
     }
 
@@ -119,16 +119,17 @@ impl<'a> YasaApp<'a> {
             self.is_running = false;
         } else {
             let source = &self.config.source;
-            self.radio.start(source.frequency as f64, source.gain, source.rate, &source.args)
+            self.radio.start(self.current_freq as f64, source.gain, source.rate, &source.args)
                 .expect("Can't start radio");
             self.is_running = true;
         }
     }
 
     // tune to given frequency
-    fn tune_action(&mut self, new_freq: u32) {
-        self.radio.tune_to(new_freq as f64).unwrap();
-        self.current_freq = new_freq;
+    fn tune_action(&mut self, new_freq: u64) {
+        if new_freq > 10 && new_freq < 1_500_000_000 {
+            self.radio.tune_to(new_freq as f64).expect("Tune error"); 
+        }
     }
 }
 
