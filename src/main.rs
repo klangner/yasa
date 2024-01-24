@@ -12,32 +12,43 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct Config {
    source: Source,
+   bookmarks: Vec<Bookmark>,
 }
 
 #[derive(Deserialize)]
 struct Source {
-    frequency: f64,
+    frequency: u32,
     gain: f64,
     rate: f64,
     args: String,
 }
 
+#[derive(Deserialize)]
+struct Bookmark {
+    name: String,
+    frequency: u32,
+}
+
 struct YasaApp<'a> {
     radio: FMRadio<'a>,
     is_running: bool,
+    current_freq: u32,
     config: Config,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { source: Default::default() }
+        Self { 
+            source: Default::default(), 
+            bookmarks: Vec::default() 
+        }
     }
 }
 
 impl Default for Source {
     fn default() -> Self {
         Self { 
-            frequency: 100_000_000.0, 
+            frequency: 100_000_000, 
             gain: 30.0, 
             rate: 100_000.0, 
             args: String::default(), 
@@ -53,6 +64,7 @@ impl<'a> YasaApp<'a> {
         Self {
             radio,
             is_running: false,
+            current_freq: config.source.frequency,
             config,
         }
     }
@@ -72,26 +84,24 @@ impl<'a> YasaApp<'a> {
                 });
             });
 
-        // egui::SidePanel::left("source_panel")
-        //     .resizable(true)
-        //     .default_width(150.0)
-        //     .width_range(80.0..=200.0)
-        //     .show(ctx, |ui| {
-        //         ui.label("Source")
-        //     });
-
-        // egui::SidePanel::right("output_panel")
-        //     .resizable(true)
-        //     .default_width(500.0)
-        //     // .width_range(100.0..=300.0)
-        //     .show(ctx, |ui| {
-        //         ui.label("Output")
-        //     });
+        egui::SidePanel::left("source_panel")
+            .resizable(true)
+            .default_width(150.0)
+            .width_range(80.0..=200.0)
+            .show(ctx, |ui| {
+                let mut new_freq = 0;
+                for bookmark in &self.config.bookmarks {
+                    if ui.link(&bookmark.name).clicked() {
+                        new_freq = bookmark.frequency;
+                    }
+                }
+                if new_freq > 0 { self.tune_action(new_freq); }
+            });
 
         // Needs to be last
         egui::CentralPanel::default()
             .show(ctx, |ui| {
-                ui.label("Bookmarks")
+                ui.label(format!("Freq: {}", self.current_freq));
             });
     }
 
@@ -109,10 +119,16 @@ impl<'a> YasaApp<'a> {
             self.is_running = false;
         } else {
             let source = &self.config.source;
-            self.radio.start(source.frequency, source.gain, source.rate, &source.args)
+            self.radio.start(source.frequency as f64, source.gain, source.rate, &source.args)
                 .expect("Can't start radio");
             self.is_running = true;
         }
+    }
+
+    // tune to given frequency
+    fn tune_action(&mut self, new_freq: u32) {
+        self.radio.tune_to(new_freq as f64).unwrap();
+        self.current_freq = new_freq;
     }
 }
 

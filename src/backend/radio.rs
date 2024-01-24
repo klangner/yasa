@@ -23,19 +23,25 @@ use futuresdr::macros::connect;
 use futuresdr::num_complex::Complex32;
 use futuresdr::num_integer::gcd;
 use futuresdr::runtime::scheduler::SmolScheduler;
+use futuresdr::runtime::Pmt;
 use futuresdr::runtime::{Flowgraph, FlowgraphHandle, Runtime};
 
 
 pub struct FMRadio<'a> {
     runtime: Runtime<'a, SmolScheduler>,
     handle: Option<FlowgraphHandle>,
+    source: Option<SourceConfig>,
+}
+
+enum SourceConfig {
+    Seify { id: usize, freq_offset: f64, freq_port_id: usize },
 }
 
 impl FMRadio<'_> {
     pub fn init() -> Self {
         futuresdr::runtime::init();
         let runtime = Runtime::new();
-        Self { runtime, handle: None }
+        Self { runtime, handle: None, source: None }
     }
 
     pub fn start(&mut self, frequency: f64, gain: f64, rate: f64, args: &str) -> Result<()> {
@@ -68,10 +74,6 @@ impl FMRadio<'_> {
             .build()
             .expect("Can't create source");
 
-        // Store the `freq` port ID for later use
-        // let freq_port_id = src
-        //     .message_input_name_to_id("freq")
-        //     .expect("No freq port found!");
 
         // Downsample before demodulation
         let interp = (audio_rate * audio_mult) as usize;
@@ -112,12 +114,16 @@ impl FMRadio<'_> {
 
         // Single-channel `AudioSink` with the downsampled rate (sample_rate / (8*5) = 48_000)
         let snk = AudioSink::new(audio_rate, 1);
+                
+        let freq_port_id = src.message_input_name_to_id("freq").unwrap();
 
         // Add all the blocks to the `Flowgraph`...
         connect!(fg, src > shift > resamp1 > demod > resamp2 > snk.in;);
 
         // Start the flowgraph and save the handle
         let (_res, handle) = self.runtime.start_sync(fg);
+        let source_block = SourceConfig::Seify { id: src, freq_offset, freq_port_id };
+        self.source = Some(source_block);
         self.handle = Some(handle);
         
         Ok(())
@@ -130,6 +136,24 @@ impl FMRadio<'_> {
         }
         self.handle = None;
 
+        Ok(())
+    }
+
+    pub fn tune_to(&mut self, new_freq: f64) -> Result<()> {
+        if let Some(handle) = &mut self.handle {
+            if let Some(source) = &self.source {
+                match source {
+                    SourceConfig::Seify { id, freq_offset, freq_port_id } => {
+                        log::info!("Tune to: {}", new_freq);
+                        async_io::block_on(handle.call(
+                            *id,
+                            *freq_port_id,
+                            Pmt::F64(new_freq + freq_offset),
+                        ))?;
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
