@@ -18,13 +18,12 @@ use futuresdr::blocks::seify::SourceBuilder;
 use futuresdr::blocks::Apply;
 use futuresdr::blocks::FirBuilder;
 use futuresdr::futuredsp::firdes;
+use futuresdr::log;
 use futuresdr::macros::connect;
 use futuresdr::num_complex::Complex32;
 use futuresdr::num_integer::gcd;
 use futuresdr::runtime::scheduler::SmolScheduler;
-use futuresdr::runtime::Flowgraph;
-use futuresdr::runtime::FlowgraphHandle;
-use futuresdr::runtime::Runtime;
+use futuresdr::runtime::{Flowgraph, FlowgraphHandle, Runtime};
 
 
 pub struct FMRadio<'a> {
@@ -42,20 +41,20 @@ impl FMRadio<'_> {
     pub fn start(&mut self, frequency: f64, gain: f64, rate: f64, args: &str) -> Result<()> {
         let sample_rate = rate as u32;
         let freq_offset = rate / 4.0;
-        println!("Frequency Offset {freq_offset:?}");
+        log::info!("Frequency Offset {freq_offset:?}");
 
         let mut audio_rates = AudioSink::supported_sample_rates();
         assert!(!audio_rates.is_empty());
         audio_rates.sort_by_key(|a| std::cmp::Reverse(gcd(*a, sample_rate)));
-        println!("Supported Audio Rates {audio_rates:?}");
+        log::info!("Supported Audio Rates {audio_rates:?}");
         let audio_rate = audio_rates[0];
-        println!("Selected Audio Rate {audio_rate:?}");
+        log::info!("Selected Audio Rate {audio_rate:?}");
 
         let mut audio_mult = 5;
         while (audio_mult * audio_rate) as f64 > freq_offset + 100e3 {
             audio_mult -= 1;
         }
-        println!("Audio Mult {audio_mult:?}");
+        log::info!("Audio Mult {audio_mult:?}");
 
         // Create the `Flowgraph` where the `Block`s will be added later on
         let mut fg = Flowgraph::new();
@@ -77,7 +76,7 @@ impl FMRadio<'_> {
         // Downsample before demodulation
         let interp = (audio_rate * audio_mult) as usize;
         let decim = sample_rate as usize;
-        println!("interp {interp}   decim {decim}");
+        log::info!("interp {interp}   decim {decim}");
         let resamp1 = FirBuilder::new_resampling::<Complex32, Complex32>(interp, decim);
 
         // Demodulation block using the conjugate delay method
@@ -103,7 +102,7 @@ impl FMRadio<'_> {
         // Ideally, this should be a FM de-emphasis filter, but the following works.
         let cutoff = 2_000.0 / (audio_rate * audio_mult) as f64;
         let transition = 10_000.0 / (audio_rate * audio_mult) as f64;
-        println!("cutoff {cutoff}   transition {transition}");
+        log::info!("cutoff {cutoff}   transition {transition}");
         let audio_filter_taps = firdes::kaiser::lowpass::<f32>(cutoff, transition, 0.1);
         let resamp2 = FirBuilder::new_resampling_with_taps::<f32, f32, _, _>(
             1,
