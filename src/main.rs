@@ -56,10 +56,9 @@ impl<'a> YasaApp<'a> {
             config,
         }
     }
-}
-
-impl eframe::App for YasaApp<'_> {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    
+    // Every frame we build full UI
+    fn draw_ui(&mut self, ctx: &egui::Context) {
         
         egui::TopBottomPanel::top("toolbar")
             .default_height(50.0)
@@ -67,17 +66,8 @@ impl eframe::App for YasaApp<'_> {
                 ui.horizontal(|ui| {
                     let run_label = if self.is_running {"Stop"} else {"Run"};
                     let run_btn = ui.button(run_label);
-                    if run_btn.clicked() || ctx.input(|i| i.key_pressed(Key::P)) {
-                        if self.is_running {
-                            self.radio.stop().unwrap();
-                            self.is_running = false;
-                        } else {
-                            let source = &self.config.source;
-                            self.radio.start( source.frequency, source.gain, source.rate, &source.args)
-                                .expect("Can't start radio");
-                            self.is_running = true;
-                        }
-
+                    if run_btn.clicked() {
+                        self.play_stop_action()
                     }
                 });
             });
@@ -102,7 +92,35 @@ impl eframe::App for YasaApp<'_> {
         egui::CentralPanel::default()
             .show(ctx, |ui| {
                 ui.label("Bookmarks")
-        });
+            });
+    }
+
+    // Application wide shortcuts
+    fn handle_shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.key_pressed(Key::P))  { 
+            self.play_stop_action() 
+        }
+    }
+
+    // Start/Stop radio action
+    fn play_stop_action(&mut self) {
+        if self.is_running {
+            self.radio.stop().expect("Can't stop radio");
+            self.is_running = false;
+        } else {
+            let source = &self.config.source;
+            self.radio.start(source.frequency, source.gain, source.rate, &source.args)
+                .expect("Can't start radio");
+            self.is_running = true;
+        }
+    }
+}
+
+
+impl eframe::App for YasaApp<'_> {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.draw_ui(ctx);
+        self.handle_shortcuts(ctx);
     }
 
 }
