@@ -16,8 +16,10 @@ use futuresdr::async_io;
 use futuresdr::blocks::audio::AudioSink;
 use futuresdr::blocks::seify::SourceBuilder;
 use futuresdr::blocks::Apply;
+use futuresdr::blocks::Fft;
 use futuresdr::blocks::FirBuilder;
 use futuresdr::futuredsp::firdes;
+use futuresdr::blocks::Sink;
 use futuresdr::log;
 use futuresdr::macros::connect;
 use futuresdr::num_complex::Complex32;
@@ -26,6 +28,7 @@ use futuresdr::runtime::scheduler::SmolScheduler;
 use futuresdr::runtime::Block;
 use futuresdr::runtime::Pmt;
 use futuresdr::runtime::{Flowgraph, FlowgraphHandle, Runtime};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 
 pub struct FMRadio<'a> {
@@ -95,6 +98,13 @@ impl FMRadio<'_> {
         // Create the `Flowgraph` and add `Block`s
         let mut fg = Flowgraph::new();
         connect!(fg, src > shift > resamp1 > demod > audio_filter > snk.in;);
+
+        // !TEST
+        let mut buffer: AllocRingBuffer<f32> = AllocRingBuffer::new(1024);
+        let fft = Fft::new(1024);
+        let norm = Sink::new(move |v: &Complex32| buffer.push(v.norm()));
+        connect!(fg, shift > fft > norm);
+        // !TEST
 
         // Start the flowgraph and save the handle
         let (_res, handle) = self.runtime.start_sync(fg);

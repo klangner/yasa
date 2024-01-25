@@ -1,0 +1,16 @@
+[source]
+gain = 30
+rate = 1_000_000
+args = ""
+
+[[bookmarks]]
+name = "Antyradio"
+frequency = 92_000_000
+
+[[bookmarks]]
+name = "Muzo.fm"
+frequency = 93_900_000
+
+[[bookmarks]]
+name = "Radio Gdansk"
+frequency = 103_700_000

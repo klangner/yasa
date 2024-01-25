@@ -1,8 +1,7 @@
-# Yet Another SDR App
+# SDR applications based on FutureSDR
 
-This application usues:
-* EGUI for UI
-* FutureSDR for signal processing
+Applications:
+* fmradio - Receiver for FM radio stations
 
 
 ## Contributing

@@ -1,0 +1,17 @@
+
+[package]
+name = "fmradio"
+description = "Yet Another SDR App"
+version = "0.1.0"
+authors = ["klangner <klangner@gmail.com>"]
+repository = "https://github.com/klangner/yasa"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+futuresdr = { version = "0.0.37", features = ["soapy", "audio", "rtlsdr"] }
+eframe = "0.25"
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+toml = "0.8"
+serde = "1.0.195"
+
