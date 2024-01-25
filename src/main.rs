@@ -118,10 +118,9 @@ impl<'a> YasaApp<'a> {
             self.radio.stop().expect("Can't stop radio");
             self.is_running = false;
         } else {
-            let source = &self.config.source;
-            self.radio.start(self.current_freq as f64, source.gain, source.rate, &source.args)
-                .expect("Can't start radio");
-            self.is_running = true;
+            if self.radio.start(self.current_freq as f64).is_ok() {
+                self.is_running = true;
+            }
         }
     }
 
@@ -152,7 +151,7 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     // Init backend
-    let radio = FMRadio::init();
+    let radio = FMRadio::init(config.source.gain, config.source.rate, &config.source.args);
     
     // Init GUI
     let options = eframe::NativeOptions {
