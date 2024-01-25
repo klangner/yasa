@@ -50,7 +50,7 @@ impl Default for Source {
         Self { 
             frequency: 100_000_000, 
             gain: 30.0, 
-            rate: 100_000.0, 
+            rate: 1_000_000.0, 
             args: String::default(), 
         }
     }
@@ -129,6 +129,7 @@ impl<'a> YasaApp<'a> {
     fn tune_action(&mut self, new_freq: u64) {
         if new_freq > 10 && new_freq < 1_500_000_000 {
             self.radio.tune_to(new_freq as f64).expect("Tune error"); 
+            self.current_freq = new_freq;
         }
     }
 }
