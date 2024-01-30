@@ -10,6 +10,9 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 futuresdr = { version = "0.0.37", features = ["soapy", "audio", "rtlsdr"] }
+dsp = "0.11"
+# dsp = { path = "../../dsp.rs" }
+# dsp = {repository = "https://github.com/klangner/dsp.rs" }
 eframe = "0.25"
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 toml = "0.8"

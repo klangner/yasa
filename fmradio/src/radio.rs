@@ -11,6 +11,7 @@
 //! by your SDR and may cause a crash.
 
 
+use dsp::core::{freq_shift::FrequencyShift, fm::QuadratureDetector};
 use futuresdr::anyhow::Result;
 use futuresdr::async_io;
 use futuresdr::blocks::audio::AudioSink;
@@ -57,7 +58,7 @@ impl FMRadio {
         }
         log::info!("Audio Mult {audio_mult:?}");
 
-        let shift = FMRadio::shift(freq_offset, rate);
+        let shift = FMRadio::shift(freq_offset as f32, rate as usize);
 
         let interp = (audio_rate * audio_mult) as usize;
         let decim = rate as usize;
@@ -66,7 +67,7 @@ impl FMRadio {
 
         let demod = FMRadio::fm_demodulation();
 
-        let audio_filter = FMRadio::audio_filter(audio_rate, audio_mult);
+        let audio_filter = FMRadio::audio_filter(audio_rate + audio_mult, audio_mult as usize);
 
         // Single-channel `AudioSink` with the downsampled rate (sample_rate / (8*5) = 48_000)
         let snk = AudioSink::new(audio_rate, 1);
@@ -115,28 +116,22 @@ impl FMRadio {
     } 
 
     // Shift signal by a given offset
-    fn shift(freq_offset: f64, rate: f64) -> Block {
-        let mut last = Complex32::new(1.0, 0.0);
-        let add = Complex32::from_polar(
-            1.0,
-            (2.0 * std::f64::consts::PI * freq_offset / rate) as f32,
-        );
-        let shift = Apply::new(move |v: &Complex32| -> Complex32 {
-            last *= add;
-            last * v
+    fn shift(freq_offset: f32, rate: usize) -> Block {
+        // let mut offset = Sine::new(freq_offset, rate);
+        let mut shifter = FrequencyShift::new(freq_offset, rate);
+        let block = Apply::new(move |v: &Complex32| -> Complex32 {
+            shifter.process_sample(v)
         });
         
-        shift
+        block
     }
 
     // Demodulation block using the conjugate delay method
     // See https://en.wikipedia.org/wiki/Detector_(radio)#Quadrature_detector
     fn fm_demodulation() -> Block {
-        let mut last = Complex32::new(0.0, 0.0); // store sample x[n-1]
+        let mut demod = QuadratureDetector::new();
         let demod = Apply::new(move |v: &Complex32| -> f32 {
-            let arg = (v * last.conj()).arg(); // Obtain phase of x[n] * conj(x[n-1])
-            last = *v;
-            arg
+            demod.process_sample(v)
         });
 
         demod
@@ -144,14 +139,14 @@ impl FMRadio {
 
     // Design filter for the audio and decimate by 5.
     // Ideally, this should be a FM de-emphasis filter, but the following works.
-    fn audio_filter(audio_rate: u32, audio_mult: u32) -> Block {
-        let cutoff = 2_000.0 / (audio_rate * audio_mult) as f64;
-        let transition = 10_000.0 / (audio_rate * audio_mult) as f64;
+    fn audio_filter(sample_rate: u32, decim: usize) -> Block {
+        let cutoff = 2_000.0 / sample_rate as f64;
+        let transition = 10_000.0 / sample_rate as f64;
         log::info!("cutoff {cutoff}   transition {transition}");
         let audio_filter_taps = firdes::kaiser::lowpass::<f32>(cutoff, transition, 0.1);
         let resamp = FirBuilder::new_resampling_with_taps::<f32, f32, _, _>(
             1,
-            audio_mult as usize,
+            decim,
             audio_filter_taps,
         );
 

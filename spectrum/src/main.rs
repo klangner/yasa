@@ -1,22 +1,23 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+mod power_sink;
+
 use eframe::{egui, CreationContext};
 use futuresdr::anyhow::Result;
 use futuresdr::blocks::seify::SourceBuilder;
-use futuresdr::blocks::{Apply, Fft, VectorSink};
+use futuresdr::blocks::Fft;
 use futuresdr::macros::connect;
-use futuresdr::num_complex::Complex32;
-use futuresdr::runtime::{Flowgraph, FlowgraphHandle, Runtime};
+use futuresdr::runtime::{Flowgraph, Runtime};
+
+use crate::power_sink::PowerSink;
 
 
 pub struct Radio {
-    handle: FlowgraphHandle,
-    sink: usize,
 }
 
 impl Radio {
     pub fn start() -> Result<Self> {
-        let frequency = 92.1 * 1e6;
+        let frequency = 91.8 * 1e6;
         let source = SourceBuilder::new()
             .frequency(frequency)
             .sample_rate(1e6)
@@ -24,29 +25,23 @@ impl Radio {
             .build()?;
         
         let fft = Fft::new(1024);
-        let norm = Apply::new(|c: &Complex32| -> f32 {c.norm()});
-        let sink = VectorSink::<f32>::new(1024);
+        let sink = PowerSink::new();
 
         // Create the `Flowgraph` and add `Block`s
         let runtime = Runtime::new();
         let mut fg = Flowgraph::new();
-        connect!(fg, source > fft > norm > sink);
+        connect!(fg, source > fft > sink);
 
         // Start the flowgraph
-        let (_res, handle) = runtime.start_sync(fg);
+        let (_res, _handle) = runtime.start_sync(fg);
         
-        Ok(Self {handle, sink})
-    }
-
-    pub fn get_samples(&self) -> &Vec<f32> {
-        let kernel = self.fg.kernel::<VectorSink<f32>>(self.sink).unwrap();
-        kernel.items()
+        Ok(Self {})
     }
 }
 
 
 struct YasaApp {
-    radio: Radio,
+    _radio: Radio,
 }
 
 impl<'a> YasaApp {
@@ -56,7 +51,7 @@ impl<'a> YasaApp {
         let radio = Radio::start().unwrap();
 
         Self {
-            radio,
+            _radio: radio,
         }
     }
 }
@@ -69,14 +64,13 @@ impl eframe::App for YasaApp {
             .default_width(200.0)
             .width_range(100.0..=300.0)
             .show(ctx, |ui| {
-                let xs = self.radio.get_samples();
-                let v: f32 = xs.iter().sum::<f32>() / xs.len() as f32;
-                ui.label(format!("f =  {}", v));
+                let v: f32 = 0.0;
+                ui.label(format!("Power =  {} dBFS (-30 for Antyradio)", v));
             });
 
         // Needs to be last
         egui::CentralPanel::default()
-            .show(ctx, |ui| {
+            .show(ctx, |_ui| {
             });
     }
 }
