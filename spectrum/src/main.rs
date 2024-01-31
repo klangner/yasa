@@ -1,47 +1,80 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod power_sink;
+// mod power_sink;
+mod channel_sink;
 
+use crossbeam::channel::{self, Receiver};
+use dsp::num_complex::Complex32;
 use eframe::{egui, CreationContext};
+use egui_plot::{Line, Plot, PlotPoints};
 use futuresdr::anyhow::Result;
 use futuresdr::blocks::seify::SourceBuilder;
-use futuresdr::blocks::Fft;
+use futuresdr::blocks::{Apply, Fft};
 use futuresdr::macros::connect;
-use futuresdr::runtime::{Flowgraph, Runtime};
+use futuresdr::runtime::{Block, Flowgraph, Runtime};
 
-use crate::power_sink::PowerSink;
+use crate::channel_sink::CrossbeamSink;
 
+const FFT_SIZE: usize = 4096;
 
 pub struct Radio {
+    output_buffer: Vec<f32>,
+    pos: usize,
+    receiver: Receiver<Box<[f32]>>,
 }
 
 impl Radio {
     pub fn start() -> Result<Self> {
+        let source_rate: usize = 3_000_000; 
         let frequency = 91.8 * 1e6;
         let source = SourceBuilder::new()
             .frequency(frequency)
-            .sample_rate(1e6)
+            .sample_rate(source_rate as f64)
             .gain(30.0)
             .build()?;
         
-        let fft = Fft::new(1024);
-        let sink = PowerSink::new();
+        // let resample = FirBuilder::new_resampling::<Complex32, Complex32>(1, 4);
+        let fft = Fft::with_options(
+            FFT_SIZE,
+            futuresdr::blocks::FftDirection::Forward,
+            true,
+            None,
+        );
+        let power = Self::lin2power_db(); 
+        let (tx, rx) = channel::unbounded::<Box<[f32]>>();
+        let sink = CrossbeamSink::new(tx.clone());
 
         // Create the `Flowgraph` and add `Block`s
         let runtime = Runtime::new();
         let mut fg = Flowgraph::new();
-        connect!(fg, source > fft > sink);
+        connect!(fg, source > fft > power > sink);
 
         // Start the flowgraph
         let (_res, _handle) = runtime.start_sync(fg);
         
-        Ok(Self {})
+        Ok(Self {output_buffer: vec![0.; FFT_SIZE], pos: 0, receiver: rx})
+    }
+
+    pub fn lin2power_db() -> Block {
+        Apply::new(|x: &Complex32| 20.0 * (x.norm() / i8::MAX as f32).log10())
+    }
+
+    pub fn items(&mut self) -> &Vec<f32> {
+        if self.receiver.len() > 0 {
+            let data = self.receiver.recv().unwrap();
+            for d in data.into_iter() {
+                self.output_buffer[self.pos] = *d;
+                self.pos += 1;
+                if self.pos >= self.output_buffer.len() { self.pos = 0; }
+            }
+        }
+        &self.output_buffer
     }
 }
 
 
 struct YasaApp {
-    _radio: Radio,
+    radio: Radio,
 }
 
 impl<'a> YasaApp {
@@ -51,7 +84,7 @@ impl<'a> YasaApp {
         let radio = Radio::start().unwrap();
 
         Self {
-            _radio: radio,
+            radio: radio,
         }
     }
 }
@@ -59,19 +92,17 @@ impl<'a> YasaApp {
 
 impl eframe::App for YasaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::SidePanel::left("bookmarks_panel")
-            .resizable(true)
-            .default_width(200.0)
-            .width_range(100.0..=300.0)
+        egui::CentralPanel::default()
             .show(ctx, |ui| {
-                let v: f32 = 0.0;
-                ui.label(format!("Power =  {} dBFS (-30 for Antyradio)", v));
+                let data = self.radio.items();
+                let points: PlotPoints = data.iter().enumerate().map(|(i, v)| [i as f64, *v as f64]).collect();
+                let line = Line::new(points);
+                Plot::new("spectrum")
+                    .view_aspect(3.0)
+                    .show(ui, |plot_ui| plot_ui.line(line));
             });
 
-        // Needs to be last
-        egui::CentralPanel::default()
-            .show(ctx, |_ui| {
-            });
+        ctx.request_repaint();
     }
 }
 
@@ -81,7 +112,7 @@ fn main() -> Result<(), eframe::Error> {
 
     // Init GUI
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 400.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([900.0, 400.0]),
         ..Default::default()
     };
 
