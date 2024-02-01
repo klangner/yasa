@@ -18,8 +18,6 @@ use crate::channel_sink::CrossbeamSink;
 const FFT_SIZE: usize = 4096;
 
 pub struct Radio {
-    output_buffer: Vec<f32>,
-    pos: usize,
     receiver: Receiver<Box<[f32]>>,
 }
 
@@ -52,23 +50,16 @@ impl Radio {
         // Start the flowgraph
         let (_res, _handle) = runtime.start_sync(fg);
         
-        Ok(Self {output_buffer: vec![0.; FFT_SIZE], pos: 0, receiver: rx})
+        Ok(Self {receiver: rx})
     }
 
     pub fn lin2power_db() -> Block {
         Apply::new(|x: &Complex32| 20.0 * (x.norm() / i8::MAX as f32).log10())
     }
 
-    pub fn items(&mut self) -> &Vec<f32> {
-        if self.receiver.len() > 0 {
-            let data = self.receiver.recv().unwrap();
-            for d in data.into_iter() {
-                self.output_buffer[self.pos] = *d;
-                self.pos += 1;
-                if self.pos >= self.output_buffer.len() { self.pos = 0; }
-            }
-        }
-        &self.output_buffer
+    pub fn items(&mut self) -> Vec<f32> {
+        let data = self.receiver.recv().unwrap();
+        data.into_vec()
     }
 }
 
