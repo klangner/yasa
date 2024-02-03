@@ -3,9 +3,7 @@
 mod channel_sink;
 mod radio;
 
-use eframe::{egui, CreationContext};
-use egui_plot::{Line, Plot, PlotPoints};
-
+use eframe::{egui::{self, *}, CreationContext};
 use radio::Radio;
 
 
@@ -23,6 +21,32 @@ impl<'a> YasaApp {
             radio: radio,
         }
     }
+
+    fn plot_spectrum(&self, ui: &mut Ui, data: &[f32]) {
+        let color = if ui.visuals().dark_mode {
+            Color32::from_additive_luminance(196)
+        } else {
+            Color32::from_black_alpha(240)
+        };
+
+        Frame::canvas(ui.style()).show(ui, |ui| {
+            // let desired_size = ui.available_width() * vec2(1.0, 1.0);
+            // let (_id, rect) = ui.allocate_space(desired_size);
+            let rect = ui.available_rect_before_wrap();
+
+            let to_screen =
+                emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=data.len() as f32, 0.0..=-100.0), rect);
+
+            let points: Vec<Pos2> = data.iter().enumerate()
+                .map(|(i, v)| {
+                    to_screen * pos2(i as f32,*v)
+                })
+                .collect();
+
+            let shape = epaint::Shape::line(points, Stroke::new(1., color));
+            ui.painter().add(shape);
+        });
+    }
 }
 
 
@@ -31,11 +55,7 @@ impl eframe::App for YasaApp {
         egui::CentralPanel::default()
             .show(ctx, |ui| {
                 let data = self.radio.items();
-                let points: PlotPoints = data.iter().enumerate().map(|(i, v)| [i as f64, *v as f64]).collect();
-                let line = Line::new(points);
-                Plot::new("spectrum")
-                    .view_aspect(3.0)
-                    .show(ui, |plot_ui| plot_ui.line(line));
+                self.plot_spectrum(ui, &data[0..500]);
             });
 
         ctx.request_repaint();

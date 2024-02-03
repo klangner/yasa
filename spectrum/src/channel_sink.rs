@@ -69,17 +69,15 @@ impl<T: Send + Copy + 'static> Kernel for CrossbeamSink<T> {
     ) -> Result<()> {
         let i = sio.input(0).slice::<T>();
 
-        if !i.is_empty() {
-            match self.sender.try_send(i.into()) {
-                Ok(_) => {
-                    info!("sent data...");
-                }
-                Err(err) => {
-                    info!("{}", err.to_string());
-                }
+        match self.sender.try_send(i.into()) {
+            Ok(_) => {
+                info!("sent data...");
             }
-            sio.input(0).consume(i.len());
+            Err(err) => {
+                info!("{}", err.to_string());
+            }
         }
+        sio.input(0).consume(i.len());
 
         if sio.input(0).finished() {
             io.finished = true;
