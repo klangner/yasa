@@ -30,8 +30,6 @@ impl<'a> YasaApp {
         };
 
         Frame::canvas(ui.style()).show(ui, |ui| {
-            // let desired_size = ui.available_width() * vec2(1.0, 1.0);
-            // let (_id, rect) = ui.allocate_space(desired_size);
             let rect = ui.available_rect_before_wrap();
 
             let to_screen =
@@ -55,7 +53,7 @@ impl eframe::App for YasaApp {
         egui::CentralPanel::default()
             .show(ctx, |ui| {
                 let data = self.radio.items();
-                self.plot_spectrum(ui, &data[0..500]);
+                self.plot_spectrum(ui, &data);
             });
 
         ctx.request_repaint();

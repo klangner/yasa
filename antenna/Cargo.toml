@@ -1,0 +1,16 @@
+
+[package]
+name = "antenna"
+description = "Measure antenna efficiency"
+version = "0.1.0"
+authors = ["klangner <klangner@gmail.com>"]
+repository = "https://github.com/klangner/yasa"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = "1.0.195"
+futuresdr = { version = "0.0.37", features = ["soapy", "rtlsdr"] }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+dsp = "0.11"
+

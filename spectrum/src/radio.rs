@@ -8,7 +8,7 @@ use futuresdr::runtime::{Block, Flowgraph, Runtime};
 
 use crate::channel_sink::CrossbeamSink;
 
-const FFT_SIZE: usize = 1024;//4096;
+const FFT_SIZE: usize = 4096;
 
 pub struct Radio {
     receiver: Receiver<Box<[f32]>>,
@@ -17,7 +17,7 @@ pub struct Radio {
 impl Radio {
     pub fn start() -> Result<Self> {
         let source_rate: usize = 2_000_000; 
-        let frequency = 91.8 * 1e6;
+        let frequency = 192.0 * 1e6;//91.8 * 1e6;
         let source = SourceBuilder::new()
             .frequency(frequency)
             .sample_rate(source_rate as f64)
@@ -51,13 +51,7 @@ impl Radio {
     }
 
     pub fn items(&mut self) -> Vec<f32> {
-        let xs = self.receiver.recv().unwrap();
-        let mut data = vec![0.; 1024];
-        if xs.len() >= 4096 {
-            for n in 0..1024 {
-                data[n] = (xs[0+n] + xs[1024+n] + xs[2*1024+n] + xs[3*1024+n]) / 4.;
-            }
-        }
-        data
+        let data = self.receiver.recv().unwrap();
+        data.into_vec()
     }
 }
